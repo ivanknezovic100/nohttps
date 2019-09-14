@@ -1,0 +1,68 @@
+CLIENT SIDE---------------------------------------------------------------------------------------------------------------------------
+
+string userName = "user1"
+string password = "my_psswrd123";
+string passwordHash = GetSha2Hash(password);
+string active Salt = GetActiveSaltFromServer(userName); //ReturnActiveSaltEndpoint funkcija na serveru
+string passwordAndSaltHash = GetSha2Hash(passwordHash+Salt);
+
+var data = { Name: "Pero", Salary: 500, Department: "It" };
+
+
+//OVO JE NAJBITNIJE---------------------------------------------------
+var dataForSend = {};
+dataForSend.RealData = data;
+dataForSend.Username = userName;
+string signature =  GetSha2Hash(dataForSend + passwordAndSaltHash);
+dataForSend.Signature = signature;
+-----------------------------------------------------------------------
+
+var json = JSON.stringify(dataForSend); 
+
+PostToServerEndpoint(dataForSend);  // PostEndpoint funkcija na serveru
+
+
+SERVER SIDE----------------------------------------------------------------------------------------------------------------------------
+
+[http post]
+function PostEndpoint(jsonData){
+
+	var dataReceived = JSON.parse(jsonData);
+	string passwordHash = DB.excecuteQuery("SELECT PasswordHash FROM tblUsers WHERE Username = dataReceived.Username");
+	string activeSalt = DB.excecuteQuery("SELECT ActiveSalt FROM tblUsers WHERE Username = dataReceived.UserName").SingleOrDefault();
+	string passwordAndSaltHash = GetSha2Hash(passwordHash + activeSalt);
+	
+	//OVO JE NAJBITNIJE---------------------------------------------------
+	var dataForCheck = {};
+	dataForCheck.RealData = dataReceived.RealData;
+	dataForCheck.Username = dataReceived.Username;
+	
+	string validSignature = GetSha2Hash(dataForCheck + passwordAndSaltHash);
+	
+	if(validSignature != dataReceived.Signature) 
+		return 403 Forbidden;
+		
+	else{
+		DB.executeProcedure("InsertData(dataReceived.RealData)");
+		DB.executeProcedure("UpdateSaltForUser(dataReceived.Username)");
+		
+		return OK;
+	}
+	-----------------------------------------------------------------------
+		
+}
+
+[http get]
+function ReturnActiveSaltEndpoint(userName){
+
+	string activeSalt = DB.excecuteQuery("SELECT ActiveSalt FROM tblUsers WHERE Username = userName").SingleOrDefault();
+	return activeSalt;
+}
+
+
+
+
+
+
+
+
